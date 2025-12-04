@@ -62,11 +62,13 @@ runs:
       shell: bash
       env:
         ESMF_DIR: ${{runner.temp}}/esmf-src
+        INSTALL_ESMF_ACTION_VERS: v1.0.2
       run: |
         mkdir -p ${ESMF_DIR}
         cd ${ESMF_DIR}
+        echo "INSTALL_ESMF_ACTION_VERS=${{env.INSTALL_ESMF_ACTION_VERS}}" > ${{github.workspace}}/.esmf-cache.txt
         if [[ "${{inputs.rebuild-check}}" == "quick" ]]; then
-          printenv | grep "^ESMF_" > ${{github.workspace}}/.esmf-cache.txt
+          printenv | grep "^ESMF_" >> ${{github.workspace}}/.esmf-cache.txt
           echo "RUNNER_OS=${{runner.os}}" >> ${{github.workspace}}/.esmf-cache.txt
           echo "RUNNER_ARCH=${{runner.arch}}" >> ${{github.workspace}}/.esmf-cache.txt
         else
@@ -82,7 +84,7 @@ runs:
         fi
     - id: cache-esmf
       if: inputs.cache == 'true'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{env.ESMF_ROOT}}
         key: esmf@${{env.ESMF_VERSION}}-${{hashFiles('.esmf-cache.txt')}}
@@ -130,17 +132,20 @@ runs:
         fi
         make -j 2
         make install
-        mkdir -p ${ESMF_INSTALL_PREFIX}/addon/esmpy
+        mkdir -p ${ESMF_INSTALL_PREFIX}/src/addon/esmpy
         if [ -d "src/addon/esmpy" ]; then
-          rsync -a src/addon/esmpy/ ${ESMF_INSTALL_PREFIX}/addon/esmpy
+          rsync -a src/addon/esmpy/ ${ESMF_INSTALL_PREFIX}/src/addon/esmpy
         elif [ -d "src/addon/ESMPy" ]; then
-          rsync -a src/addon/ESMPy/ ${ESMF_INSTALL_PREFIX}/addon/esmpy
+          rsync -a src/addon/ESMPy/ ${ESMF_INSTALL_PREFIX}/src/addon/esmpy
         fi
     - id: install-esmpy
       if: inputs.esmpy == 'true'
       shell: bash
       run: |
-        cd ${{env.ESMF_ROOT}}/addon/esmpy
+        mkdir -p ${{env.ESMF_ROOT}}/src/Infrastructure/Util/include
+        cd ${{env.ESMF_ROOT}}/src/Infrastructure/Util/include
+        rsync -a ${{env.ESMF_ROOT}}/include/ESMC_Macros.h .
+        cd ${{env.ESMF_ROOT}}/src/addon/esmpy
         python -m pip install --upgrade pip
         python -m pip install .
 branding:
