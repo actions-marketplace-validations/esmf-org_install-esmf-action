@@ -1,5 +1,10 @@
 # Releases
 
+### 1.1.0
+
+- Added support for downloading branches and SHAs
+- Fixed bug resolving ESMF URLs by avoiding GitHub API usage
+
 ### 1.0.0
 
 - Installs ESMF libraries and binaries into `${HOME}/esmf-${ESMF_VERSION}`

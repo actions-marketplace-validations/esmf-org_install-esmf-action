@@ -33,26 +33,30 @@ runs:
     - id: version-esmf
       shell: bash
       run: |
-        if [[ "${{inputs.version}}" == "latest" ]]; then
-          ESMF_API_URL="https://api.github.com/repos/esmf-org/esmf/releases/latest"
-          curl --silent -L "${ESMF_API_URL}" > ${{runner.temp}}/.esmf-gh.info
-          ESMF_VERSION=`cat ${{runner.temp}}/.esmf-gh.info | grep '^  "tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'`
-          rm -f ${{runner.temp}}/.esmf-gh.info
-          ESMF_URL="https://github.com/esmf-org/esmf/archive/refs/tags/${ESMF_VERSION}.tar.gz"
-        elif [[ "${{inputs.version}}" == "develop" ]]; then
-          ESMF_API_URL="https://api.github.com/repos/esmf-org/esmf/branches/develop?page=1"
-          curl --silent -L "${ESMF_API_URL}" > ${{runner.temp}}/.esmf-gh.info
-          ESMF_COMMIT=`cat ${{runner.temp}}/.esmf-gh.info | grep '^    "sha":' | sed -E 's/.*"([^"]+)".*/\1/'`
-          rm -f ${{runner.temp}}/.esmf-gh.info
-          ESMF_URL="https://github.com/esmf-org/esmf/archive/${ESMF_COMMIT}.tar.gz"
-          ESMF_VERSION="develop"
-          echo "ESMF_COMMIT=${ESMF_COMMIT}" >> ${GITHUB_ENV}
-        else
-          ESMF_URL="https://github.com/esmf-org/esmf/archive/refs/tags/${{inputs.version}}.tar.gz"
-          ESMF_VERSION="${{inputs.version}}"
+        set -euo pipefail
+
+        ESMF_VERSION="${{inputs.version}}"
+        if [[ "${ESMF_VERSION}" == "latest" ]]; then
+          # Derive latest tag from release redirect to avoid GitHub API rate limits.
+          LATEST_TAG_URL=$(curl -s -L -o /dev/null -w '%{url_effective}' \
+            "https://github.com/esmf-org/esmf/releases/latest" || true)
+          ESMF_VERSION="${LATEST_TAG_URL##*/}"
+          if [ -z "$ESMF_VERSION" ] || [ "$ESMF_VERSION" == "latest" ]; then
+            echo "::error::Failed to determine latest ESMF release tag from redirect"
+            exit 1
+          fi
         fi
-        echo "esmf-url=${ESMF_URL}" >> ${GITHUB_OUTPUT}
-        echo "ESMF_VERSION=${ESMF_VERSION}" >> ${GITHUB_ENV}
+        ESMF_URL="https://github.com/esmf-org/esmf/archive/${ESMF_VERSION}.tar.gz"
+        # Populate commit hash when a matching remote tag is available.
+        ESMF_COMMIT=$(git ls-remote --exit-code --heads --tags \
+          "https://github.com/esmf-org/esmf.git" \
+          "${ESMF_VERSION}" 2>/dev/null | awk '{print $1}' || true)
+
+        echo "esmf-url=${ESMF_URL}" >> "${GITHUB_OUTPUT}"
+        echo "ESMF_VERSION=${ESMF_VERSION}" >> "${GITHUB_ENV}"
+        if [ -n "$ESMF_COMMIT" ]; then
+          echo "ESMF_COMMIT=${ESMF_COMMIT}" >> "${GITHUB_ENV}"
+        fi
         if [ -z "${{env.ESMF_INSTALL_PREFIX}}" ]; then
           echo "ESMF_ROOT=${HOME}/.esmf-cache" >> ${GITHUB_ENV}
         else
@@ -62,7 +66,7 @@ runs:
       shell: bash
       env:
         ESMF_DIR: ${{runner.temp}}/esmf-src
-        INSTALL_ESMF_ACTION_VERS: v1.0.2
+        INSTALL_ESMF_ACTION_VERS: v1.1.0
       run: |
         mkdir -p ${ESMF_DIR}
         cd ${ESMF_DIR}
