@@ -97,11 +97,11 @@ Uniquely describe the ESMF build context in order to prevent `esmf-cache-key`
 collisions.
 
 #### version
-`install-esmf-action` automatically determines version when version is set to
-`latest` or `develop`. The `latest` version will determine the latest ESMF
-release. The `develop` version will determine the latest ESMF commit to the
-ESMF `develop` branch. Cache misses will be frequent when selecting the
-`develop` version and this will consume the cache quota.
+When `version` is set to `latest`, `install-esmf-action` determines the
+latest release by following the https://github.com/esmf-org/esmf/releases/latest
+redirect and downloading the resolved release tag. All other tags and branches
+are downloaded using the `version` string. Moving refs like `develop` may
+create frequent cache misses.
 
 #### esmpy
 Enabling esmpy installs esmpy using pip and requires ESMF v8.3.0+.
